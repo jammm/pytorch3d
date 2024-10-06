@@ -29,7 +29,11 @@ __global__ void FarthestPointSamplingKernel(
   typedef cub::BlockReduce<
       cub::KeyValuePair<int64_t, float>,
       block_size,
+#ifdef __HIP_PLATFORM_AMD__
+      hipcub::BlockReduceAlgorithm::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>
+#else
       cub::BLOCK_REDUCE_RAKING_COMMUTATIVE_ONLY>
+#endif
       BlockReduce;
   __shared__ typename BlockReduce::TempStorage temp_storage;
   __shared__ int64_t selected_store;

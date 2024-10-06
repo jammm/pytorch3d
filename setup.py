@@ -66,6 +66,8 @@ def get_extensions():
         # We take the risk that CUB and Thrust are incompatible, because
         # we aren't using parts of Thrust which actually use CUB.
         define_macros += [("THRUST_IGNORE_CUB_VERSION_CHECK", None)]
+        if torch.version.hip is not None:
+            define_macros += [("HIP_ENABLE_WARP_SYNC_BUILTINS", None)]
         cub_home = os.environ.get("CUB_HOME", None)
         nvcc_args = [
             "-DCUDA_HAS_FP16=1",

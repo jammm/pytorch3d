@@ -25,6 +25,7 @@ namespace cg = cooperative_groups;
 #endif
 
 #define HANDLECUDA(CMD) CMD
+
 // handleCudaError((CMD), __FILE__, __LINE__)
 inline void
 handleCudaError(const cudaError_t err, const char* file, const int line) {
@@ -55,7 +56,7 @@ getLastCudaError(const char* errorMessage, const char* file, const int line) {
 #define ALIGN(VAL) __align__(VAL)
 #define SYNC() HANDLECUDE(cudaDeviceSynchronize())
 #define THREADFENCE_B() __threadfence_block()
-#define SHFL_SYNC(a, b, c) __shfl_sync((a), (b), (c))
+#define SHFL_SYNC(a, b, c) __shfl_sync((uint64_t)(a), (b), (c))
 #define SHARED __shared__
 #define ACTIVEMASK() __activemask()
 #define BALLOT(mask, val) __ballot_sync((mask), val)
@@ -68,15 +69,15 @@ DEVICE T
 WARP_CUMSUM(const cg::coalesced_group& group, const uint& mask, const T& base) {
   T ret = base;
   T shfl_val;
-  shfl_val = __shfl_down_sync(mask, ret, 1u); // Deactivate the rightmost lane.
+  shfl_val = __shfl_down_sync((uint64_t)mask, ret, 1u); // Deactivate the rightmost lane.
   ret += (group.thread_rank() < 31) * shfl_val;
-  shfl_val = __shfl_down_sync(mask, ret, 2u);
+  shfl_val = __shfl_down_sync((uint64_t)mask, ret, 2u);
   ret += (group.thread_rank() < 30) * shfl_val;
-  shfl_val = __shfl_down_sync(mask, ret, 4u); // ...4
+  shfl_val = __shfl_down_sync((uint64_t)mask, ret, 4u); // ...4
   ret += (group.thread_rank() < 28) * shfl_val;
-  shfl_val = __shfl_down_sync(mask, ret, 8u); // ...8
+  shfl_val = __shfl_down_sync((uint64_t)mask, ret, 8u); // ...8
   ret += (group.thread_rank() < 24) * shfl_val;
-  shfl_val = __shfl_down_sync(mask, ret, 16u); // ...16
+  shfl_val = __shfl_down_sync((uint64_t)mask, ret, 16u); // ...16
   ret += (group.thread_rank() < 16) * shfl_val;
   return ret;
 }
@@ -85,11 +86,11 @@ template <typename T>
 DEVICE T
 WARP_MAX(const cg::coalesced_group& group, const uint& mask, const T& base) {
   T ret = base;
-  ret = max(ret, __shfl_down_sync(mask, ret, 16u));
-  ret = max(ret, __shfl_down_sync(mask, ret, 8u));
-  ret = max(ret, __shfl_down_sync(mask, ret, 4u));
-  ret = max(ret, __shfl_down_sync(mask, ret, 2u));
-  ret = max(ret, __shfl_down_sync(mask, ret, 1u));
+  ret = max(ret, __shfl_down_sync((uint64_t)mask, ret, 16u));
+  ret = max(ret, __shfl_down_sync((uint64_t)mask, ret, 8u));
+  ret = max(ret, __shfl_down_sync((uint64_t)mask, ret, 4u));
+  ret = max(ret, __shfl_down_sync((uint64_t)mask, ret, 2u));
+  ret = max(ret, __shfl_down_sync((uint64_t)mask, ret, 1u));
   return ret;
 }
 
@@ -97,11 +98,11 @@ template <typename T>
 DEVICE T
 WARP_SUM(const cg::coalesced_group& group, const uint& mask, const T& base) {
   T ret = base;
-  ret = ret + __shfl_down_sync(mask, ret, 16u);
-  ret = ret + __shfl_down_sync(mask, ret, 8u);
-  ret = ret + __shfl_down_sync(mask, ret, 4u);
-  ret = ret + __shfl_down_sync(mask, ret, 2u);
-  ret = ret + __shfl_down_sync(mask, ret, 1u);
+  ret = ret + __shfl_down_sync((uint64_t)mask, ret, 16u);
+  ret = ret + __shfl_down_sync((uint64_t)mask, ret, 8u);
+  ret = ret + __shfl_down_sync((uint64_t)mask, ret, 4u);
+  ret = ret + __shfl_down_sync((uint64_t)mask, ret, 2u);
+  ret = ret + __shfl_down_sync((uint64_t)mask, ret, 1u);
   return ret;
 }
 
@@ -142,6 +143,7 @@ INLINE DEVICE float3 WARP_SUM_FLOAT3(
 #define FMA(x, y, z) __fmaf_rn((x), (y), (z))
 #define I2F(a) __int2float_rn(a)
 #define FRCP(x) __frcp_rn(x)
+#ifndef __HIP_PLATFORM_AMD__
 __device__ static float atomicMax(float* address, float val) {
   int* address_as_i = (int*)address;
   int old = *address_as_i, assumed;
@@ -166,6 +168,7 @@ __device__ static float atomicMin(float* address, float val) {
   } while (assumed != old);
   return __int_as_float(old);
 }
+#endif
 #define DMAX(a, b) FMAX(a, b)
 #define DMIN(a, b) FMIN(a, b)
 #define DSQRT(a) sqrt(a)
@@ -250,6 +253,7 @@ __device__ static float atomicMin(float* address, float val) {
         (int*)NULL,                                      \
         (NUM_OBJECTS));                                  \
   }
+
 #define GET_SUM_WS_SIZE(RES_PTR, TYPE_SUM, NUM_OBJECTS) \
   {                                                     \
     cub::DeviceReduce::Sum(                             \
@@ -259,6 +263,7 @@ __device__ static float atomicMin(float* address, float val) {
         (TYPE_SUM*)NULL,                                \
         NUM_OBJECTS);                                   \
   }
+
 #define GET_MM_WS_SIZE(RES_PTR, TYPE, NUM_OBJECTS)                         \
   {                                                                        \
     TYPE init = TYPE();                                                    \

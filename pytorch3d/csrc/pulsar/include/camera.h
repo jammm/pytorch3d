@@ -63,7 +63,7 @@ inline bool operator==(const CamInfo& a, const CamInfo& b) {
 };
 
 struct CamGradInfo {
-  HOST DEVICE CamGradInfo();
+  HOST DEVICE CamGradInfo(int _unused = 0);
   float3 cam_pos;
   float3 pixel_0_0_center;
   float3 pixel_dir_x;
@@ -72,6 +72,7 @@ struct CamGradInfo {
 
 // TODO: remove once https://github.com/NVlabs/cub/issues/172 is resolved.
 struct IntWrapper {
+  HOST DEVICE IntWrapper(int _val = 0) : val(_val) {}
   int val;
 };
 
